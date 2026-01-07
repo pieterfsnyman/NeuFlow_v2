@@ -15,7 +15,7 @@ from huggingface_hub import PyTorchModelHubMixin
 class NeuFlow(torch.nn.Module,
               PyTorchModelHubMixin,
               repo_url="https://github.com/neufieldrobotics/NeuFlow_v2", license="apache-2.0", pipeline_tag="image-to-image"):
-    def __init__(self):
+    def __init__(self, image_width, image_height):
         super(NeuFlow, self).__init__()
 
         self.backbone = backbone_v7.CNNEncoder(config.feature_dim_s16, config.context_dim_s16, config.feature_dim_s8, config.context_dim_s8)
@@ -48,6 +48,8 @@ class NeuFlow(torch.nn.Module,
         for p in self.parameters():
             if p.dim() > 1:
                 torch.nn.init.xavier_uniform_(p)
+        
+        self.init_bhwd(1, image_height, image_width, 'cuda')
 
     def init_bhwd(self, batch_size, height, width, device, amp=True):
 
@@ -64,7 +66,7 @@ class NeuFlow(torch.nn.Module,
         self.init_iter_context_s16 = torch.zeros(batch_size, config.iter_context_dim_s16, height//16, width//16, device=device, dtype=torch.half if amp else torch.float)
         self.init_iter_context_s8 = torch.zeros(batch_size, config.iter_context_dim_s8, height//8, width//8, device=device, dtype=torch.half if amp else torch.float)
 
-    def split_features(self, features, context_dim, feature_dim):
+    def split_features(self, features, context_dim: int, feature_dim: int):
 
         context, features = torch.split(features, [context_dim, feature_dim], dim=1)
 
@@ -73,7 +75,7 @@ class NeuFlow(torch.nn.Module,
 
         return features, torch.relu(context)
 
-    def forward(self, img0, img1, iters_s16=1, iters_s8=8):
+    def forward(self, img0, img1, iters_s16: int=1, iters_s8: int=8):
 
         flow_list = []
 
@@ -89,7 +91,7 @@ class NeuFlow(torch.nn.Module,
 
         feature0_s16, feature1_s16 = features_s16.chunk(chunks=2, dim=0)
 
-        flow0 = self.matching_s16.global_correlation_softmax(feature0_s16, feature1_s16)
+        flow0 = self.matching_s16(feature0_s16, feature1_s16)
 
         # flow0 = self.flow_attn_s16(feature0_s16, flow0)
 
@@ -110,12 +112,12 @@ class NeuFlow(torch.nn.Module,
             flow0 = flow0 + delta_flow
 
             if self.training:
-                up_flow0 = F.interpolate(flow0, scale_factor=16, mode='bilinear') * 16
+                up_flow0 = F.interpolate(flow0, scale_factor=16.0, mode='bilinear') * 16
                 flow_list.append(up_flow0)
 
-        flow0 = F.interpolate(flow0, scale_factor=2, mode='nearest') * 2
+        flow0 = F.interpolate(flow0, scale_factor=2.0, mode='nearest') * 2
 
-        features_s16 = F.interpolate(features_s16, scale_factor=2, mode='nearest')
+        features_s16 = F.interpolate(features_s16, scale_factor=2.0, mode='nearest')
 
         features_s8 = self.merge_s8(torch.cat([features_s8, features_s16], dim=1))
 
@@ -123,7 +125,7 @@ class NeuFlow(torch.nn.Module,
 
         corr_pyr_s8 = self.corr_block_s8.init_corr_pyr(feature0_s8, feature1_s8)
 
-        context_s16 = F.interpolate(context_s16, scale_factor=2, mode='nearest')
+        context_s16 = F.interpolate(context_s16, scale_factor=2.0, mode='nearest')
 
         context_s8 = self.context_merge_s8(torch.cat([context_s8, context_s16], dim=1))
 

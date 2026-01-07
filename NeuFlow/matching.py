@@ -1,16 +1,16 @@
+import torch.nn as nn
 import torch.nn.functional as F
 
 from NeuFlow import utils
 
 
-class Matching:
+class Matching(nn.Module):
 
     def init_bhwd(self, batch_size, height, width, device, amp):
         self.grid = utils.coords_grid(batch_size, height, width, device, amp)  # [B, 2, H, W]
         self.flatten_grid = self.grid.view(batch_size, 2, -1).permute(0, 2, 1)  # [B, H*W, 2]
 
-    def global_correlation_softmax(self, feature0, feature1):
-
+    def forward(self, feature0, feature1):
         b, c, h, w = feature0.shape
 
         feature0 = feature0.flatten(-2).permute(0, 2, 1)

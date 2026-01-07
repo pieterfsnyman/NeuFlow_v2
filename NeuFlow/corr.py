@@ -1,4 +1,7 @@
+from typing import List
+
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 import math
 
@@ -14,15 +17,14 @@ def bilinear_sample(img, coords):
 
     grid = torch.cat([xgrid, ygrid], dim=-1)
 
-    with torch.backends.cudnn.flags(enabled=False):
-        img = F.grid_sample(img, grid, align_corners=True)
+    img = F.grid_sample(img, grid, align_corners=True)
 
     return img
 
 
-class CorrBlock:
+class CorrBlock(nn.Module):
     def __init__(self, radius, levels):
-
+        super().__init__()
         self.radius = radius
         self.levels = levels
 
@@ -36,7 +38,7 @@ class CorrBlock:
         self.grid = utils.coords_grid(batch_size, height, width, device, amp)
         self.delta = delta.repeat(batch_size * height * width, 1, 1, 1)
 
-    def __call__(self, corr_pyramid, flow):
+    def forward(self, corr_pyramid: List[torch.Tensor], flow):
 
         b, _, h, w = flow.shape
 

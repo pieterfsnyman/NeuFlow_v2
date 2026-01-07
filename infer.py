@@ -8,8 +8,8 @@ from NeuFlow.backbone_v7 import ConvBlock
 from data_utils import flow_viz
 
 
-image_width = 768
-image_height = 432
+image_width = 640
+image_height = 480
 
 def get_cuda_image(image_path):
     image = cv2.imread(image_path)
@@ -55,7 +55,7 @@ vis_path = 'test_results/'
 
 device = torch.device('cuda')
 
-model = NeuFlow().to(device)
+model = NeuFlow(image_width, image_height).to(device)
 
 checkpoint = torch.load('neuflow_mixed.pth', map_location='cuda')
 
@@ -72,7 +72,9 @@ for m in model.modules():
 model.eval()
 model.half()
 
-model.init_bhwd(1, image_height, image_width, 'cuda')
+model = torch.jit.script(model)
+model = torch.jit.optimize_for_inference(model)
+model.save('neuflow_mixed_scripted.pth')
 
 if not os.path.exists(vis_path):
     os.makedirs(vis_path)
