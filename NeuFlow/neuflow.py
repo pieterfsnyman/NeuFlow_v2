@@ -79,8 +79,8 @@ class NeuFlow(torch.nn.Module,
 
         flow_list = []
 
-        img0 /= 255.
-        img1 /= 255.
+        img0 = img0 / 255.
+        img1 = img1 / 255.
 
         features_s16, features_s8 = self.backbone(torch.cat([img0, img1], dim=0))
 
